@@ -15,10 +15,14 @@ from typing import NamedTuple
 
 
 class Element(NamedTuple):
-    """登记、追迹时使用的规范化元件描述。"""
+    """登记、追迹时使用的规范化元件描述。
+
+    ``params`` 的折射率分量可以是数值（恒定折射率），也可以是字符串
+    （具名材料档）；拼矩阵前必须先把材料名按当前波长解析成数值。
+    """
 
     kind: str          # "space" | "lens" | "refract"
-    params: dict[str, float]
+    params: dict[str, float | str]
 
     def describe(self) -> dict[str, object]:
         return {"type": self.kind, "params": dict(self.params)}
@@ -102,7 +106,10 @@ def element_matrix(element: Element) -> tuple[float, float, float, float]:
     if element.kind == "lens":
         return lens_matrix(element.params["f"])
     if element.kind == "refract":
-        return refract_matrix(element.params["R"],
-                              element.params["n1"], element.params["n2"])
+        n1, n2 = element.params["n1"], element.params["n2"]
+        if isinstance(n1, str) or isinstance(n2, str):
+            # 材料名必须先经 spectral.resolve_elements 按波长解析成数值
+            raise ValueError("折射面仍挂着未解析的材料名，不能拼矩阵")
+        return refract_matrix(element.params["R"], n1, n2)
     # 入参检查保证不会到达这里
     raise ValueError(f"未知元件种类: {element.kind}")  # pragma: no cover
